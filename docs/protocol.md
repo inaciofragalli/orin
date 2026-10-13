@@ -1,7 +1,7 @@
 # Protocolo de comunicação do Orin
 
-**Status:** proposta de trabalho; nenhum formato de pacote está implementado  
-**Atualizado em:** 12/10/2026
+**Status:** proposta de trabalho; codec experimental de pacotes implementado no desktop Java
+**Atualizado em:** 13/10/2026
 
 ## Escopo inicial
 
@@ -53,9 +53,29 @@ A primeira prova de conceito pode enviar somente blocos PCM para um receptor con
 | Tipo de conteúdo | Identificar PCM e, futuramente, outros codecs |
 | Payload | Amostras de áudio do bloco |
 
-**Ainda não definimos os tamanhos em bytes, a ordem desses campos nem sua codificação.** Antes disso, vale avaliar o uso de um protocolo conhecido, como RTP, em vez de inventar um cabeçalho completo sem necessidade.
+### Formato experimental implementado no desktop
 
-Se adotarmos um formato próprio e pequeno para o experimento, ele terá testes de serialização e desserialização tanto em Kotlin quanto em Java. O contrato escrito neste arquivo será atualizado junto com as implementações.
+`AudioPacketCodec` codifica e decodifica um bloco PCM de exatamente 960 bytes. O pacote completo tem 976 bytes: cabeçalho de 16 bytes seguido do áudio.
+
+| Offset em bytes | Tamanho | Campo | Valor ou representação |
+| --- | --- | --- | --- |
+| 0 | 4 | Assinatura | `0x4F52494E`, bytes ASCII `ORIN` |
+| 4 | 1 | Versão | `1` |
+| 5 | 1 | Tipo de pacote | `1`, áudio |
+| 6 | 4 | Número de sequência | `int` Java de 32 bits |
+| 10 | 4 | Timestamp | `int` Java de 32 bits |
+| 14 | 2 | Comprimento do PCM | `960` |
+| 16 | 960 | Payload | Bytes PCM copiados sem conversão |
+
+Os campos de múltiplos bytes do cabeçalho usam **big-endian**. O áudio continua **little-endian**, conforme o formato PCM proposto. O codec não converte nem valida as amostras; preserva os bytes recebidos.
+
+`encode` rejeita PCM nulo com `NullPointerException` e tamanhos diferentes de 960 com `IllegalArgumentException`. `decode` rejeita datagramas nulos com `NullPointerException`; tamanho diferente de 976, assinatura, versão, tipo ou comprimento de PCM inválidos resultam em `IllegalArgumentException`.
+
+O codec apenas transporta os valores de sequência e timestamp fornecidos pelo chamador. Unidades, origem do timestamp, política de sequência e tratamento de overflow ainda não foram definidos. Não há identificador de sessão, ordenação, jitter buffer, autenticação ou criptografia neste formato experimental.
+
+A implementação atual existe somente em Java, com testes de bytes do cabeçalho, preservação do payload, codificação, decodificação e rejeição de pacotes inválidos. A implementação Kotlin e os testes de compatibilidade entre os aplicativos ficam para a integração Android.
+
+O codec ainda não está conectado ao receptor UDP ou à reprodução PCM. `UdpAudioReceiver` recebe até 960 bytes e truncaria um pacote de 976 bytes; o buffer deverá ser compatibilizado antes dessa integração. A avaliação de RTP ou de outro protocolo consolidado permanece pendente antes de estabilizar o formato.
 
 ## Recepção e temporização
 
