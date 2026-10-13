@@ -9,13 +9,13 @@
 ![Java](https://img.shields.io/badge/Java_25-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Gradle](https://img.shields.io/badge/Gradle-02303A?style=for-the-badge&logo=gradle&logoColor=white)
 
-<br/>
+![Repo size](https://img.shields.io/github/repo-size/inaciofragalli/orin?style=flat-square)
+![Last commit](https://img.shields.io/github/last-commit/inaciofragalli/orin?style=flat-square)
 
-[Tecnologias](#tecnologias) •
-[Objetivo](#objetivo-da-primeira-versão) •
+[Visão geral](#visão-geral) •
 [Estado atual](#estado-do-desenvolvimento) •
+[Tecnologias](#tecnologias) •
 [Desenvolvimento](#desenvolvimento-local) •
-[Comunicação](#comunicação-e-áudio) •
 [Documentação](#documentação) •
 [Roadmap](#próximas-etapas)
 
@@ -23,133 +23,182 @@
 
 ---
 
-O Orin é um projeto de aplicativo que permite usar o microfone de um celular Android como entrada de áudio em computadores Linux e Windows pela rede Wi-Fi local. A ideia surgiu da necessidade de usar programas diferentes para essa função em um desktop com dual boot.
+## Visão geral
 
-O objetivo inicial é substituir o AudioRelay no Linux e o WO Mic no Windows por uma solução própria, com o mesmo aplicativo Android e um receptor desktop multiplataforma. O projeto será desenvolvido primeiro para uso pessoal.
+O **Orin** é um projeto de aplicativo para transformar o microfone de um celular Android em uma entrada de áudio para computadores Linux e Windows, usando a rede Wi-Fi local.
 
-> **Estado atual:** o Orin está na fase de preparação do repositório e dos projetos. A captura de áudio, a transmissão pela rede e o microfone virtual ainda não foram implementados. As decisões descritas abaixo são o ponto de partida do desenvolvimento e podem mudar após os primeiros testes.
+A primeira entrega utilizável será voltada ao **Linux**. O suporte ao Windows virá depois, aproveitando o núcleo Java e adaptando a integração com os dispositivos de áudio do sistema.
 
-## Tecnologias
-
-O projeto usa um monorepo com dois builds Gradle independentes.
-
-| Componente | Tecnologias previstas |
-| --- | --- |
-| Android | Kotlin, Jetpack Compose, Material 3 e `AudioRecord` |
-| Desktop | Java 25, Java Sound API e interface simples em Swing ou JavaFX |
-| Comunicação | UDP e áudio PCM sem compressão nos primeiros testes |
-| Linux | PipeWire para disponibilizar o áudio como microfone virtual |
-| Windows | Dispositivo de áudio virtual existente, inicialmente VB-CABLE ou equivalente |
-| Build e testes | Gradle Kotlin DSL, JUnit e ferramentas de teste do Android |
-
-Rust ou C++ poderão ser usados em componentes nativos, caso as APIs disponíveis no Java não atendam a alguma integração. Nenhum componente desse tipo está previsto para a primeira etapa.
-
-## Objetivo da primeira versão
-
-O fluxo de uso planejado é simples: abrir o receptor no computador, conectar o aplicativo Android pela rede local e selecionar o microfone virtual do Orin no Discord ou em outro programa.
-
-Para chegar à versão 1.0 pessoal, o projeto deverá:
-
-1. Capturar o áudio do microfone Android e transmiti-lo por Wi-Fi.
-2. Receber e encaminhar o áudio no desktop com latência adequada para conversas.
-3. Disponibilizar uma entrada de microfone no Linux e no Windows.
-4. Permitir conectar, desconectar e acompanhar o estado da conexão por interfaces pequenas.
-5. Lidar com interrupções da rede, perda de pacotes e encerramento da captura.
-6. Proteger a comunicação com pareamento, autenticação e criptografia.
-
-A primeira entrega utilizável será voltada ao Linux. O suporte ao Windows virá depois, aproveitando o núcleo Java e adaptando a integração com áudio.
+> **Estado atual:** as bases de reprodução PCM, recepção UDP e codificação/decodificação de pacotes já foram implementadas e testadas no desktop Java. Esses componentes **ainda não formam um fluxo integrado**. O Orin ainda não captura áudio do Android, não cria um microfone virtual e não está pronto para substituir os aplicativos existentes.
 
 ## Estado do desenvolvimento
 
-Ainda não há funcionalidades prontas para uso. O trabalho começa pelo desktop Java, com testes de geração e reprodução de áudio. Em seguida serão implementados o receptor UDP e a captura no Android.
+| Componente | Estado | O que existe |
+| --- | --- | --- |
+| Projetos e automações | Implementado | Monorepo com builds Gradle independentes para Android e desktop; CI e Dependabot |
+| Saída PCM no desktop | Implementado e testado | `PcmAudioOutput`, `AudioLineFactory`, controle de abertura/escrita/fechamento e `drain()` |
+| Reprodução real no Linux | Validada manualmente | Programa que gera e reproduz um tom de 440 Hz por um segundo |
+| Receptor UDP | Implementado e testado | `UdpAudioReceiver`, porta configurável, timeout, liberação do socket e testes em loopback |
+| Codec de pacotes | Implementado e testado | `AudioPacketCodec` e `AudioPacket`; cabeçalho experimental e testes de entradas inválidas |
+| Integração UDP → codec → áudio | Pendente | Receber um datagrama completo, decodificá-lo e reproduzir o payload |
+| Captura e transmissão Android | Pendente | `AudioRecord` e envio dos quadros PCM por Wi-Fi |
+| Microfone virtual Linux | Pendente | Encaminhamento do áudio para dispositivo virtual via PipeWire |
+| Microfone virtual Windows | Pendente | Integração com um dispositivo virtual existente, como VB-CABLE |
+| Segurança da conexão | Pendente | Pareamento, autenticação e transporte criptografado |
 
-Os marcos estão detalhados em [docs/roadmap.md](docs/roadmap.md). O roteiro foi organizado para que os experimentos iniciais possam ser aproveitados no aplicativo, sem exigir uma arquitetura extensa antes de termos áudio funcionando.
+Os testes de unidade e integração local cobrem os componentes de áudio, rede e protocolo. As quatro entregas iniciais do desktop foram integradas à `main`: PCM, receptor UDP, codec experimental e configuração do Gradle Configuration Cache.
+
+**O que já foi demonstrado:** reprodução de PCM por uma saída real no Linux e troca de datagramas UDP entre sockets no próprio computador. **O que ainda não foi demonstrado:** áudio vindo do celular e chegando a um programa que reconheça o Orin como microfone.
+
+## Tecnologias
+
+| Área | Tecnologias e decisões |
+| --- | --- |
+| Android | Kotlin, Jetpack Compose e Material 3; captura futura com `AudioRecord` |
+| Desktop | Java 25, Java Sound API; interface gráfica ainda não definida |
+| Rede | UDP na rede local, inicialmente com IP e porta informados manualmente |
+| Áudio | PCM mono, 48 kHz, 16 bits com sinal, little-endian |
+| Linux | PipeWire para integração com microfone virtual (pendente) |
+| Windows | Dispositivo de áudio virtual existente, inicialmente VB-CABLE ou equivalente (pendente) |
+| Build | Gradle Kotlin DSL; projetos Android e desktop independentes |
+| Testes | JUnit, Mockito e testes com sockets UDP reais em loopback |
+| Automação | GitHub Actions para builds/testes independentes e Dependabot |
+
+Não há necessidade planejada de servidor na nuvem, conta de usuário ou banco de dados. Código nativo em Rust ou C++ será considerado apenas se a integração com os sistemas operacionais exigir.
+
+## Comunicação e áudio
+
+O formato de áudio adotado nos primeiros experimentos é **PCM sem compressão**:
+
+| Propriedade | Valor |
+| --- | --- |
+| Taxa de amostragem | 48.000 Hz |
+| Canais | 1 (mono) |
+| Profundidade | 16 bits com sinal |
+| Ordem dos bytes PCM | Little-endian |
+| Duração de um quadro | 10 ms |
+| Payload por quadro | 960 bytes |
+
+O codec experimental do desktop monta um datagrama de **976 bytes**, formado por um **cabeçalho de 16 bytes** em big-endian e **960 bytes de PCM** em little-endian. O cabeçalho inclui a assinatura `ORIN`, versão, tipo, número de sequência, timestamp e comprimento do payload.
+
+```text
+Android (planejado)                 Desktop (parcialmente implementado)
+AudioRecord
+     │
+Quadros PCM
+     │
+Envio por UDP ───── Wi-Fi ──────> UdpAudioReceiver
+                                        │
+                                 AudioPacketCodec
+                                        │
+                                  PcmAudioOutput
+                                        │
+                              Saída de áudio / diagnóstico
+                                        │
+                             Microfone virtual (futuro)
+```
+
+**Atenção:** esse diagrama representa o fluxo pretendido, **não um pipeline já integrado**. O `UdpAudioReceiver` atual utiliza um buffer de até **960 bytes**, enquanto o `AudioPacketCodec` espera **976 bytes**. Antes de conectá-los, será necessário ajustar a recepção para suportar o datagrama completo e detectar pacotes grandes demais sem truncamento silencioso.
+
+Ainda faltam controle de sessão, ordenação e temporização de pacotes, jitter buffer e proteção criptográfica. O cabeçalho é experimental e poderá mudar após os testes de interoperabilidade com Kotlin ou a avaliação de protocolos consolidados. Consulte [a documentação do protocolo](docs/protocol.md) para detalhes dos campos e limitações.
 
 ## Desenvolvimento local
 
 ### Pré-requisitos
 
-- Git.
-- IntelliJ IDEA e JDK 25 para o projeto desktop.
+- Git e os Gradle Wrappers incluídos no repositório.
+- IntelliJ IDEA e JDK 25 para desenvolver o desktop.
 - Android Studio e Android SDK para o aplicativo Android.
-- Um dispositivo Android com microfone para os testes reais.
-- Linux com PipeWire para os primeiros experimentos de microfone virtual.
+- Um dispositivo Android com microfone para os testes futuros de captura.
+- Um dispositivo de saída de áudio disponível para o teste manual de reprodução.
 
-O aplicativo Android será testado em um celular físico conectado por USB ao Android Studio. **O USB será usado para instalar e depurar o aplicativo; o transporte de áudio continuará sendo feito pelo Wi-Fi.**
-
-Cada projeto terá seu próprio Gradle Wrapper. Não é necessário instalar Gradle globalmente.
+O repositório contém **dois projetos Gradle separados** e um único histórico Git. Os comandos de build devem ser executados dentro da pasta correspondente.
 
 ### Desktop
 
-Abra `desktop/` no IntelliJ IDEA como projeto Gradle. Quando o projeto tiver sido criado, será possível verificar o build com:
+Abra `desktop/` no IntelliJ IDEA como projeto Gradle. Para compilar e executar os testes:
 
 ```bash
 cd desktop
 ./gradlew build
 ```
 
-A execução e os argumentos do receptor serão documentados depois da implementação inicial.
+Para executar somente os testes do componente PCM:
+
+```bash
+./gradlew test --tests dev.orin.desktop.audio.PcmAudioOutputTest
+```
+
+O programa de diagnóstico `dev.orin.desktop.audio.AudioOutputManualCheck` pode ser executado pela ação **Run** no IntelliJ. Ele gera um tom senoidal de **440 Hz** com duração de um segundo e amplitude reduzida. Comece com o volume do sistema baixo. O programa usa `drain()` para aguardar a reprodução antes de fechar a saída.
+
+A aplicação desktop ainda não possui um fluxo completo de conexão ou uma interface final para utilização como microfone.
 
 ### Android
 
-Abra `android/` no Android Studio, configure o SDK e selecione o dispositivo físico para executar a aplicação. O APK de debug poderá ser compilado pelo terminal:
+Abra `android/` no Android Studio, instale o SDK correspondente e execute no dispositivo desejado. Para compilar o APK de depuração e executar os testes unitários disponíveis:
 
 ```bash
 cd android
-./gradlew :app:assembleDebug
+./gradlew :app:assembleDebug :app:testDebugUnitTest
 ```
 
-Esses comandos pressupõem que os projetos Gradle já tenham sido gerados pelas IDEs.
+O projeto Android ainda não implementa a captura nem a transmissão do microfone. Uma conexão USB pode ser usada para instalação e depuração pelo Android Studio; o transporte de áudio pretendido continua sendo o Wi-Fi.
+
+### Integração contínua
+
+O workflow em `.github/workflows/ci.yml` executa separadamente o build do desktop com **JDK 25** e a compilação/testes do Android com **JDK 17** e Android SDK. As dependências são acompanhadas pelo Dependabot.
+
+O desktop tem **Gradle Configuration Cache** habilitado, atualmente configurado para reportar eventuais problemas de compatibilidade como avisos.
 
 ## Estrutura do repositório
 
 ```text
 orin/
-├── android/                 # Aplicativo Kotlin, aberto no Android Studio
-├── desktop/                 # Aplicativo Java, aberto no IntelliJ IDEA
+├── android/                 # Aplicativo Android em Kotlin e Compose
+├── desktop/                 # Núcleo Java, áudio, rede e protocolo
 ├── docs/
-│   ├── architecture.md      # Componentes, stack e integração com os sistemas
-│   ├── protocol.md          # Formato de áudio e comunicação entre dispositivos
+│   ├── architecture.md      # Visão arquitetural e integração com os sistemas
+│   ├── protocol.md          # Formato experimental dos pacotes e comunicação
 │   └── roadmap.md           # Fases e critérios de conclusão
-├── .github/                 # Workflows quando os builds estiverem configurados
+├── .github/
+│   ├── workflows/ci.yml     # Build e testes dos dois projetos
+│   └── dependabot.yml       # Atualização de dependências
 ├── .editorconfig
 ├── .gitattributes
 ├── .gitignore
 └── README.md
 ```
 
-A raiz contém um único repositório Git. Android e desktop são projetos Gradle separados. Inicialmente, a documentação do protocolo será compartilhada entre as implementações em Kotlin e Java; um módulo de código compartilhado só será criado se houver necessidade.
+## Objetivo do MVP
 
-## Comunicação e áudio
+A primeira versão realmente utilizável do Orin deverá permitir usar a voz capturada no Android como **microfone no Linux**, em aplicações como Discord e navegador, com latência adequada para conversas.
 
-A proposta inicial utiliza PCM mono de 16 bits a 48 kHz, dividido em blocos de 10 ms e enviado por UDP. Esse formato facilita observar os dados e testar buffers antes de considerar compressão com Opus.
+Para isso, ainda será necessário integrar os componentes desktop, capturar e transmitir áudio no Android, criar a entrada virtual via PipeWire e implementar pareamento, autenticação e criptografia. Também serão necessários controles de início/parada, tratamento de desconexões e uma interface mínima.
 
-O receptor Java será responsável por receber os pacotes, organizar o áudio e encaminhá-lo ao dispositivo selecionado. A integração com PipeWire ou com o dispositivo virtual no Windows ficará separada da lógica de rede.
-
-O formato definitivo dos pacotes, a negociação de parâmetros e o mecanismo de proteção do transporte ainda serão definidos. Consulte [docs/protocol.md](docs/protocol.md) para as decisões em estudo.
+O Windows será uma expansão posterior, aproveitando a mesma aplicação Android e a maior parte do receptor Java. A versão 1.0 pessoal tem como objetivo oferecer instalação e uso nos dois sistemas desktop.
 
 ## Privacidade e limitações
 
-O Orin foi planejado para funcionar na rede local, sem conta, servidor na nuvem ou telemetria. O áudio não deverá ser gravado em disco durante o uso normal.
+O Orin foi projetado para operar na rede local, sem contas, serviços de nuvem ou telemetria. O áudio não deverá ser gravado durante o funcionamento normal; quaisquer arquivos ou tons de diagnóstico serão utilizados somente em testes explícitos.
 
-A rede local não garante privacidade por si só. Testes iniciais poderão usar UDP sem criptografia apenas em ambiente controlado. **O aplicativo não deverá ser considerado seguro para uso cotidiano antes da implementação e validação de autenticação e criptografia.**
+**Uma rede Wi-Fi local não torna o tráfego privado.** Os testes experimentais sem criptografia devem ocorrer apenas em ambientes controlados. O Orin **não está pronto para uso cotidiano com dados sensíveis** enquanto não houver autenticação, integridade e criptografia do transporte.
 
-No Windows, a primeira versão poderá exigir a instalação separada de um driver de áudio virtual. O Orin não pretende desenvolver nem distribuir um driver próprio no MVP.
+O Orin não oferece hoje conexão automática entre dispositivos, microfone virtual ou gerenciamento completo de sessões. No Windows, poderá ser necessária a instalação independente de um dispositivo virtual de terceiros; não há driver próprio planejado para o MVP.
 
 ## Documentação
 
-| Arquivo | Conteúdo |
+| Documento | Conteúdo |
 | --- | --- |
-| [Arquitetura](docs/architecture.md) | Organização dos aplicativos, fluxo do áudio e integrações com Linux e Windows |
-| [Protocolo](docs/protocol.md) | PCM, pacotes UDP, buffers, compatibilidade e segurança |
-| [Roadmap](docs/roadmap.md) | Etapas de implementação e resultados esperados |
+| [Arquitetura](docs/architecture.md) | Organização do sistema, responsabilidades e integração com Linux/Windows |
+| [Protocolo](docs/protocol.md) | PCM, cabeçalho experimental, validações, temporização e segurança |
+| [Roadmap](docs/roadmap.md) | Etapas previstas e critérios para um protótipo e MVP úteis |
 
 ## Próximas etapas
 
-1. Concluir a criação dos projetos Android e desktop e verificar seus builds.
-2. Gerar e reproduzir áudio no desktop com a Java Sound API.
-3. Transmitir blocos PCM entre dois programas Java por UDP.
-4. Capturar áudio no Android e recebê-lo no desktop.
-5. Integrar o microfone virtual no Linux.
+1. Integrar o receptor UDP ao codec e à saída PCM, corrigindo o tamanho do buffer e validando o fluxo ponta a ponta no desktop.
+2. Implementar captura com `AudioRecord` e envio de quadros PCM no Android.
+3. Ouvir no Linux o áudio capturado pelo celular por Wi-Fi.
+4. Integrar PipeWire para disponibilizar o áudio como microfone virtual.
+5. Medir e melhorar latência, estabilidade, segurança e experiência de conexão antes de considerar um MVP utilizável.
 
-Descoberta automática de dispositivos, USB como transporte de áudio, Bluetooth, filtros avançados e driver próprio para Windows ficam fora da primeira versão.
+Descoberta automática, áudio via USB, Bluetooth, compressão com Opus, filtros avançados, vários transmissores e driver virtual próprio ficam fora do escopo inicial.
