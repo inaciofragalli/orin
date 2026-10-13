@@ -33,4 +33,35 @@ public final class AudioPacketCodec {
         return buffer.array();
     }
 
+    public static AudioPacket decode(byte[] datagram) {
+        Objects.requireNonNull(datagram, "Datagram cannot be null");
+
+        if (datagram.length != DATAGRAM_SIZE) {
+            throw new IllegalArgumentException("Invalid Datagram size");
+        }
+
+        ByteBuffer buffer = ByteBuffer.wrap(datagram)
+            .order(ByteOrder.BIG_ENDIAN);
+
+        int magic = buffer.getInt();
+        int version = Byte.toUnsignedInt(buffer.get());
+        int type = Byte.toUnsignedInt(buffer.get());
+
+        if (magic != 0x4F52494E || version != 1 || type != 1) {
+            throw new IllegalArgumentException("Invalid packet header");
+        }
+
+        int sequence = buffer.getInt();
+        int timestamp = buffer.getInt();
+        int length = Short.toUnsignedInt(buffer.getShort());
+
+        if (length != PCM_FRAME_SIZE) {
+            throw new IllegalArgumentException("Invalid PCM length");
+        }
+
+        byte[] pcm = new byte[length];
+        buffer.get(pcm);
+
+        return new AudioPacket(sequence, timestamp, pcm);
+    }
 }
