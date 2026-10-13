@@ -265,4 +265,43 @@ class PcmAudioOutputTest {
         }
     }
 
+    @Test
+    void shouldDrainPendingAudio() throws Exception {
+        AudioFormat format = new AudioFormat(48000, 16, 1, true, false);
+        SourceDataLine line = mock(SourceDataLine.class);
+        when(line.isOpen()).thenReturn(true);
+        byte[] pcm = {10, 20};
+        when(line.write(pcm, 0, pcm.length)).thenReturn(pcm.length);
+
+        try (PcmAudioOutput output = new PcmAudioOutput(format, ignored -> line)) {
+            output.open();
+            output.write(pcm);
+            output.drain();
+        }
+        var order = inOrder(line);
+        order.verify(line).write(pcm, 0, pcm.length);
+        order.verify(line).drain();
+        order.verify(line).stop();
+        order.verify(line).flush();
+        order.verify(line).close();
+    }
+
+    @Test
+    void shouldRejectDrainBeforeOpen() {
+        AudioFormat format = new AudioFormat(48000, 16, 1, true, false);
+        PcmAudioOutput output = new PcmAudioOutput(format);
+        assertThrows(IllegalStateException.class, output::drain);
+    }
+
+    @Test
+    void shouldRejectDrainAfterClose() throws Exception {
+        AudioFormat format = new AudioFormat(48000, 16, 1, true, false);
+        SourceDataLine line = mock(SourceDataLine.class);
+        when(line.isOpen()).thenReturn(true);
+        PcmAudioOutput output = new PcmAudioOutput(format, ignored -> line);
+        output.open();
+        output.close();
+        assertThrows(IllegalStateException.class, output::drain);
+        verify(line, never()).drain();
+    }
 }

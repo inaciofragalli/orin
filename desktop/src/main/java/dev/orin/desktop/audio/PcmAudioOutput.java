@@ -61,6 +61,13 @@ public final class PcmAudioOutput implements AutoCloseable{
         }
     }
 
+    public void drain() {
+        if (line == null || !line.isOpen()) {
+            throw new IllegalStateException("Audio output is not open");
+        }
+        line.drain();
+    }
+
     @Override
     public void close() {
         if (line == null) {
