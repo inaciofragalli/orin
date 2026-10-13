@@ -1,4 +1,27 @@
+<div align="center">
+
 # Orin
+
+### Microfone sem fio via Wi-Fi para Linux e Windows, utilizando Android
+
+![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack_Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)
+![Java](https://img.shields.io/badge/Java_25-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![Gradle](https://img.shields.io/badge/Gradle-02303A?style=for-the-badge&logo=gradle&logoColor=white)
+
+<br/>
+
+[Tecnologias](#tecnologias) •
+[Objetivo](#objetivo-da-primeira-versão) •
+[Estado atual](#estado-do-desenvolvimento) •
+[Desenvolvimento](#desenvolvimento-local) •
+[Comunicação](#comunicação-e-áudio) •
+[Documentação](#documentação) •
+[Roadmap](#próximas-etapas)
+
+</div>
+
+---
 
 O Orin é um projeto de aplicativo que permite usar o microfone de um celular Android como entrada de áudio em computadores Linux e Windows pela rede Wi-Fi local. A ideia surgiu da necessidade de usar programas diferentes para essa função em um desktop com dual boot.
 
@@ -130,7 +153,3 @@ No Windows, a primeira versão poderá exigir a instalação separada de um driv
 5. Integrar o microfone virtual no Linux.
 
 Descoberta automática de dispositivos, USB como transporte de áudio, Bluetooth, filtros avançados e driver próprio para Windows ficam fora da primeira versão.
-
-## Licença
-
-O projeto é inicialmente pessoal. Uma eventual publicação como código aberto sob a licença MIT ainda será decidida. Até lá, não há licença pública definida.
