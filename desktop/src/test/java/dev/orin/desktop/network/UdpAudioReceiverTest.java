@@ -5,10 +5,14 @@ import org.junit.jupiter.api.Test;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketTimeoutException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class UdpAudioReceiverTest {
     @Test
@@ -34,4 +38,16 @@ class UdpAudioReceiverTest {
         }
     }
 
+    @Test
+    void shouldTimeOutWhenNoPacketArrives() throws Exception {
+        try (var executor = Executors.newSingleThreadExecutor();
+             UdpAudioReceiver receiver = new UdpAudioReceiver(0, 100)) {
+            var received = executor.submit(receiver::receive);
+
+            ExecutionException failure = assertThrows(ExecutionException.class,
+                () -> received.get(2, TimeUnit.SECONDS));
+
+            assertInstanceOf(SocketTimeoutException.class, failure.getCause());
+        }
+    }
 }

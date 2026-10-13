@@ -13,6 +13,11 @@ public final class UdpAudioReceiver implements AutoCloseable {
         this.socket = new DatagramSocket(port);
     }
 
+    public UdpAudioReceiver(int port, int timeoutMillis) throws SocketException {
+        this.socket = new DatagramSocket(port);
+        this.socket.setSoTimeout(timeoutMillis);
+    }
+
     public byte[] receive() throws IOException {
         byte[] buffer = new byte[960];
 
