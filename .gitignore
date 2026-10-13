@@ -1,0 +1,28 @@
+# Gradle
+.gradle/
+**/build/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# Android
+local.properties
+.cxx/
+.externalNativeBuild/
+captures/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+
+# Operating systems
+.DS_Store
+Thumbs.db
+
+# Native builds (future)
+target/
