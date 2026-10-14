@@ -75,7 +75,17 @@ O codec apenas transporta os valores de sequência e timestamp fornecidos pelo c
 
 A implementação atual existe somente em Java, com testes de bytes do cabeçalho, preservação do payload, codificação, decodificação e rejeição de pacotes inválidos. A implementação Kotlin e os testes de compatibilidade entre os aplicativos ficam para a integração Android.
 
-O codec ainda não está conectado ao receptor UDP ou à reprodução PCM. `UdpAudioReceiver` recebe até 960 bytes e truncaria um pacote de 976 bytes; o buffer deverá ser compatibilizado antes dessa integração. A avaliação de RTP ou de outro protocolo consolidado permanece pendente antes de estabilizar o formato.
+### Pipeline experimental UDP → codec → reprodução
+
+`DesktopAudioPipeline.receiveAndPlayNext()` recebe um datagrama com `UdpAudioReceiver`, decodifica-o com `AudioPacketCodec` e escreve o payload em `PcmAudioOutput`. Cada chamada processa um pacote. O chamador é responsável por abrir e fechar os recursos e por chamar `drain()` quando precisar aguardar o término da reprodução.
+
+O buffer do receptor tem **977 bytes**, um byte a mais que o pacote válido de 976 bytes. Isso permite receber o pacote completo e rejeitar excesso: um datagrama de 977 bytes é inválido pelo tamanho; um datagrama maior é truncado pelo socket para 977 bytes e também é rejeitado, mesmo quando começa com um pacote válido. O receptor não recupera o tamanho original de um datagrama truncado.
+
+Pacotes inválidos não chegam à saída PCM. Erros de decodificação, timeout e falhas de reprodução são propagados ao chamador. Após tratar um pacote inválido, é possível processar uma nova chamada; isso não implica descarte ou recuperação automática nos programas de diagnóstico, que encerram ao encontrar um erro.
+
+O fluxo foi validado manualmente em loopback no Linux, com um tom de 440 Hz durante aproximadamente três segundos, tanto em um processo Java como com emissor e receptor em processos independentes. Os testes automatizados usam sockets reais em loopback e saída PCM mockada; cobrem também truncamento com prefixo válido, timeout e uma chamada válida após rejeição de pacote inválido.
+
+A recepção e a escrita de áudio são síncronas. Ainda não há controle de sessão, ordenação, jitter buffer, compensação de perda, autenticação ou criptografia. Captura Android, interoperabilidade Kotlin, validação em Wi-Fi e integração com microfone virtual permanecem pendentes. A avaliação de RTP ou de outro protocolo consolidado permanece pendente antes de estabilizar o formato.
 
 ## Recepção e temporização
 

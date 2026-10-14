@@ -1,5 +1,7 @@
 package dev.orin.desktop.network;
 
+import dev.orin.desktop.protocol.AudioPacketCodec;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -19,7 +21,7 @@ public final class UdpAudioReceiver implements AutoCloseable {
     }
 
     public byte[] receive() throws IOException {
-        byte[] buffer = new byte[960];
+        byte[] buffer = new byte[AudioPacketCodec.DATAGRAM_SIZE + 1];
 
         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
         socket.receive(packet);

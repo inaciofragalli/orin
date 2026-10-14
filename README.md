@@ -29,7 +29,7 @@ O **Orin** é um projeto de aplicativo para transformar o microfone de um celula
 
 A primeira entrega utilizável será voltada ao **Linux**. O suporte ao Windows virá depois, aproveitando o núcleo Java e adaptando a integração com os dispositivos de áudio do sistema.
 
-> **Estado atual:** as bases de reprodução PCM, recepção UDP e codificação/decodificação de pacotes já foram implementadas e testadas no desktop Java. Esses componentes **ainda não formam um fluxo integrado**. O Orin ainda não captura áudio do Android, não cria um microfone virtual e não está pronto para substituir os aplicativos existentes.
+> **Estado atual:** as bases de reprodução PCM, recepção UDP e codificação/decodificação de pacotes já foram implementadas e testadas no desktop Java. O pipeline experimental **UDP → codec → reprodução PCM** foi integrado e validado em loopback, incluindo dois processos Java independentes. O Orin ainda não captura áudio do Android, não cria um microfone virtual e não está pronto para substituir os aplicativos existentes.
 
 ## Estado do desenvolvimento
 
@@ -40,15 +40,15 @@ A primeira entrega utilizável será voltada ao **Linux**. O suporte ao Windows 
 | Reprodução real no Linux | Validada manualmente | Programa que gera e reproduz um tom de 440 Hz por um segundo |
 | Receptor UDP | Implementado e testado | `UdpAudioReceiver`, porta configurável, timeout, liberação do socket e testes em loopback |
 | Codec de pacotes | Implementado e testado | `AudioPacketCodec` e `AudioPacket`; cabeçalho experimental e testes de entradas inválidas |
-| Integração UDP → codec → áudio | Pendente | Receber um datagrama completo, decodificá-lo e reproduzir o payload |
+| Integração UDP → codec → áudio | Implementada e validada em loopback | `DesktopAudioPipeline` recebe, decodifica e encaminha o PCM à saída de áudio |
 | Captura e transmissão Android | Pendente | `AudioRecord` e envio dos quadros PCM por Wi-Fi |
 | Microfone virtual Linux | Pendente | Encaminhamento do áudio para dispositivo virtual via PipeWire |
 | Microfone virtual Windows | Pendente | Integração com um dispositivo virtual existente, como VB-CABLE |
 | Segurança da conexão | Pendente | Pareamento, autenticação e transporte criptografado |
 
-Os testes de unidade e integração local cobrem os componentes de áudio, rede e protocolo. As quatro entregas iniciais do desktop foram integradas à `main`: PCM, receptor UDP, codec experimental e configuração do Gradle Configuration Cache.
+Os testes de unidade e integração local cobrem os componentes de áudio, rede e protocolo, além do pipeline e da rejeição de datagramas excedentes mesmo após truncamento. As quatro entregas iniciais do desktop foram integradas à `main`: PCM, receptor UDP, codec experimental e configuração do Gradle Configuration Cache.
 
-**O que já foi demonstrado:** reprodução de PCM por uma saída real no Linux e troca de datagramas UDP entre sockets no próprio computador. **O que ainda não foi demonstrado:** áudio vindo do celular e chegando a um programa que reconheça o Orin como microfone.
+**O que já foi demonstrado:** reprodução de PCM por uma saída real no Linux e transmissão de tons por UDP com decodificação e reprodução no próprio computador, tanto em um processo como entre dois processos Java independentes. **O que ainda não foi demonstrado:** áudio vindo do celular e chegando a um programa que reconheça o Orin como microfone.
 
 ## Tecnologias
 
@@ -82,7 +82,7 @@ O formato de áudio adotado nos primeiros experimentos é **PCM sem compressão*
 O codec experimental do desktop monta um datagrama de **976 bytes**, formado por um **cabeçalho de 16 bytes** em big-endian e **960 bytes de PCM** em little-endian. O cabeçalho inclui a assinatura `ORIN`, versão, tipo, número de sequência, timestamp e comprimento do payload.
 
 ```text
-Android (planejado)                 Desktop (parcialmente implementado)
+Android (planejado)                 Desktop (pipeline experimental)
 AudioRecord
      │
 Quadros PCM
@@ -98,7 +98,7 @@ Envio por UDP ───── Wi-Fi ──────> UdpAudioReceiver
                              Microfone virtual (futuro)
 ```
 
-**Atenção:** esse diagrama representa o fluxo pretendido, **não um pipeline já integrado**. O `UdpAudioReceiver` atual utiliza um buffer de até **960 bytes**, enquanto o `AudioPacketCodec` espera **976 bytes**. Antes de conectá-los, será necessário ajustar a recepção para suportar o datagrama completo e detectar pacotes grandes demais sem truncamento silencioso.
+O trecho desktop **UDP → codec → reprodução PCM** está integrado. `UdpAudioReceiver` utiliza um buffer de **977 bytes**: recebe o pacote válido de 976 bytes por inteiro e preserva um byte adicional para que o codec rejeite datagramas excedentes. Pacotes maiores que o buffer são truncados para 977 bytes e continuam inválidos. A captura Android e o microfone virtual permanecem planejados.
 
 Ainda faltam controle de sessão, ordenação e temporização de pacotes, jitter buffer e proteção criptográfica. O cabeçalho é experimental e poderá mudar após os testes de interoperabilidade com Kotlin ou a avaliação de protocolos consolidados. Consulte [a documentação do protocolo](docs/protocol.md) para detalhes dos campos e limitações.
 
@@ -129,7 +129,13 @@ Para executar somente os testes do componente PCM:
 ./gradlew test --tests dev.orin.desktop.audio.PcmAudioOutputTest
 ```
 
-O programa de diagnóstico `dev.orin.desktop.audio.AudioOutputManualCheck` pode ser executado pela ação **Run** no IntelliJ. Ele gera um tom senoidal de **440 Hz** com duração de um segundo e amplitude reduzida. Comece com o volume do sistema baixo. O programa usa `drain()` para aguardar a reprodução antes de fechar a saída.
+O programa de diagnóstico `dev.orin.desktop.diagnostics.AudioOutputManualCheck` pode ser executado pela ação **Run** no IntelliJ. Ele gera um tom senoidal de **440 Hz** com duração de um segundo e amplitude reduzida. Comece com o volume do sistema baixo. O programa usa `drain()` para aguardar a reprodução antes de fechar a saída.
+
+Para validar o pipeline em loopback, execute `dev.orin.desktop.diagnostics.UdpAudioLoopbackCheck` pela ação **Run**. Ele envia 300 quadros de 10 ms com um tom de 440 Hz e aguarda a reprodução, totalizando aproximadamente três segundos.
+
+Também é possível executar dois processos Java independentes: inicie primeiro `dev.orin.desktop.diagnostics.UdpAudioReceiverCheck` e aguarde a mensagem de recepção na porta 50000; depois execute `dev.orin.desktop.diagnostics.UdpAudioSenderCheck`. O emissor usa o endereço de loopback, portanto ambos devem rodar no mesmo computador. O receptor espera 300 quadros e possui timeout de 30 segundos por recepção. Esses diagnósticos requerem uma saída de áudio disponível e foram validados manualmente no Linux.
+
+`DesktopAudioPipeline.receiveAndPlayNext()` processa um datagrama por chamada e propaga erros de recepção, decodificação ou reprodução. Após tratar um pacote inválido, o chamador pode tentar a próxima chamada. Os diagnósticos atuais encerram ao encontrar um erro; não implementam recuperação automática, controle de sessão, reordenação ou compensação de perda.
 
 A aplicação desktop ainda não possui um fluxo completo de conexão ou uma interface final para utilização como microfone.
 
@@ -173,7 +179,7 @@ orin/
 
 A primeira versão realmente utilizável do Orin deverá permitir usar a voz capturada no Android como **microfone no Linux**, em aplicações como Discord e navegador, com latência adequada para conversas.
 
-Para isso, ainda será necessário integrar os componentes desktop, capturar e transmitir áudio no Android, criar a entrada virtual via PipeWire e implementar pareamento, autenticação e criptografia. Também serão necessários controles de início/parada, tratamento de desconexões e uma interface mínima.
+Para isso, ainda será necessário capturar e transmitir áudio no Android, criar a entrada virtual via PipeWire e implementar pareamento, autenticação e criptografia. Também serão necessários controles de início/parada, tratamento de desconexões e uma interface mínima.
 
 O Windows será uma expansão posterior, aproveitando a mesma aplicação Android e a maior parte do receptor Java. A versão 1.0 pessoal tem como objetivo oferecer instalação e uso nos dois sistemas desktop.
 
@@ -195,7 +201,7 @@ O Orin não oferece hoje conexão automática entre dispositivos, microfone virt
 
 ## Próximas etapas
 
-1. Integrar o receptor UDP ao codec e à saída PCM, corrigindo o tamanho do buffer e validando o fluxo ponta a ponta no desktop.
+1. Exercitar perda, reordenação e atraso de pacotes no pipeline experimental e definir o tratamento desses eventos antes da integração com o Android.
 2. Implementar captura com `AudioRecord` e envio de quadros PCM no Android.
 3. Ouvir no Linux o áudio capturado pelo celular por Wi-Fi.
 4. Integrar PipeWire para disponibilizar o áudio como microfone virtual.
