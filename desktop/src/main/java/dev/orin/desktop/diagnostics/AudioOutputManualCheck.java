@@ -1,4 +1,6 @@
-package dev.orin.desktop.audio;
+package dev.orin.desktop.diagnostics;
+
+import dev.orin.desktop.audio.PcmAudioOutput;
 
 import javax.sound.sampled.AudioFormat;
 
